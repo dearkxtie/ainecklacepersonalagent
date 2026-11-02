@@ -604,6 +604,24 @@ Keep these goals in mind when giving advice or suggestions.
 
 """
 
+    # GAIA: always give the agent a core profile of the user, so a brand-new chat
+    # already "remembers" who they are without having to decide to call get_memories_tool.
+    memory_profile_section = ""
+    try:
+        _, _profile_str = get_prompt_memories(uid)
+        _profile_str = (_profile_str or "").strip()
+        if _profile_str:
+            _profile_str = _profile_str[:6000]  # keep the prompt bounded
+            memory_profile_section = f"""
+
+<core_memory_profile>
+What you already know about {user_name} (from saved memories). Use it naturally in every answer;
+you do not need a tool call to recall these. For specific past events, still use search_conversations_tool.
+{escape(_profile_str, quote=False)}
+</core_memory_profile>"""
+    except Exception as e:
+        logger.error(f"GAIA: failed to load core memory profile: {e}")
+
     # Add page context if provided. Conversation id and/or start/end dates hard-scope
     # retrieval tools (#4515); the prompt must match that fail-closed contract.
     context_section = ""
@@ -662,7 +680,7 @@ Keep these goals in mind when giving advice or suggestions.
             f"📝 Using prompt: {cached_prompt.prompt_name} (commit: {cached_prompt.prompt_commit}, source: {cached_prompt.source})"
         )
 
-        return base_prompt.strip() + platform_section + selected_app_section
+        return base_prompt.strip() + memory_profile_section + platform_section + selected_app_section
 
     except Exception as e:
         logger.error(f"⚠️  Error fetching/rendering LangSmith prompt, using inline fallback: {e}")
@@ -888,7 +906,7 @@ When the user asks about specific dates/times, they are ALWAYS referring to date
 Remember: Use tools strategically to provide the best possible answers. For questions about specific EVENTS or INCIDENTS (e.g., "when did X happen?", "what happened at Y?"), use search_conversations_tool to find relevant conversations. For questions about static FACTS/PREFERENCES (e.g., "what's my favorite X?", "do I like Y?"), use get_memories_tool. Your goal is to help {user_name} in the most personalized and helpful way possible.
 """
 
-    return base_prompt.strip() + platform_section + selected_app_section
+    return base_prompt.strip() + memory_profile_section + platform_section + selected_app_section
 
 
 def _get_agentic_qa_prompt_fallback(variables: dict[str, Any]) -> str:  # type: ignore[reportUnusedFunction]  # offline/CI fallback when LangSmith prompt fetch fails
